@@ -14,7 +14,7 @@ const AppleSymbol = 0x25CF
 
 const GameFrameWidth = 30
 const GameFrameHeight = 15
-const GameFrameSymbol = "||"
+const GameFrameSymbol = '║'
 
 var VelocityRow = 1
 var VelocityCol = 2
@@ -99,8 +99,9 @@ func drawState() {
 
 	screen.Clear()
 	printString(0, 0, debugLog)
+	printGameFrame()
 	for _, obj := range gameObjects {
-		drawObject(obj.row, obj.col, obj.width, obj.height, obj.symbol)
+		drawRectArea(obj.row, obj.col, obj.width, obj.height, obj.symbol)
 	}
 
 	screen.Show()
@@ -121,6 +122,18 @@ func drawState() {
 // 	}
 // }
 
+func printGameFrame() {
+
+	screenWidth, screenHeight := screen.Size()
+	row, col := (screenHeight/2-GameFrameHeight/2)-1, (screenWidth/2-GameFrameWidth/2)-1
+	width, height := GameFrameWidth+2, GameFrameHeight+2
+
+	drawRectPerimeter(row, col, width, height, GameFrameSymbol)
+	// drawRectPerimeter(row+1, col+1, width, height, '*')
+	drawRectPerimeter(row+1, col+1, GameFrameWidth, GameFrameHeight, '*')
+
+}
+
 func pringStringCentered(row, col int, str string) {
 	col = col - len(str)/2
 	printString(row, col, str)
@@ -133,12 +146,28 @@ func printString(row, col int, str string) {
 	}
 }
 
-func drawObject(row, col, width, height int, ch rune) {
+func drawRectArea(row, col, width, height int, ch rune) {
 	for r := 0; r < height; r++ {
 		for c := 0; c < width; c++ {
 			screen.SetContent(col+c, row+r, ch, nil, tcell.StyleDefault)
 		}
 	}
+}
+
+func drawRectPerimeter(row, col, width, height int, ch rune) {
+	for c := 0; c < width; c++ {
+		screen.SetContent(col+c, row, ch, nil, tcell.StyleDefault)
+	}
+
+	for r := 1; r < height-1; r++ {
+		screen.SetContent(col, row+r, ch, nil, tcell.StyleDefault)
+		screen.SetContent(col+width-1, row+r, ch, nil, tcell.StyleDefault)
+	}
+
+	for c := 0; c < width; c++ {
+		screen.SetContent(col+c, row+height-1, ch, nil, tcell.StyleDefault)
+	}
+
 }
 
 func initUserInput() chan string {
