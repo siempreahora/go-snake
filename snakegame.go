@@ -16,20 +16,26 @@ const GameFrameWidth = 30
 const GameFrameHeight = 15
 const GameFrameSymbol = '║'
 
-var VelocityRow = 1
-var VelocityCol = 2
+type Point struct {
+	row, col int
+}
 
-type GameObject struct {
-	row, col, width, height int
-	velRow, velCol          int
-	symbol                  rune
+type Snake struct {
+	body           []*Point
+	velRow, velCol int
+	symbol         rune
+}
+
+type Apple struct {
+	point  *Point
+	symbol rune
 }
 
 var screen tcell.Screen
+var snake *Snake
+var apple *Apple
 var isGamePaused bool
 var debugLog string
-
-var gameObjects = []*GameObject{}
 
 // This program just prints "Hello, World!".  Press ESC to exit.
 func main() {
@@ -57,6 +63,10 @@ func main() {
 	os.Exit(0)
 }
 
+/* ****************************************** */
+// INITIALIZING/UPDATING THE GAME //
+/* ****************************************** */
+
 func initScreen() {
 	var err error
 	screen, err = tcell.NewScreen()
@@ -77,7 +87,22 @@ func initScreen() {
 }
 
 func initGameState() {
-	gameObjects = []*GameObject{}
+	snake = &Snake{
+		body: []*Point{
+			{row: 5, col: 3},
+			{row: 6, col: 3},
+			{row: 7, col: 3},
+			{row: 8, col: 3},
+			{row: 9, col: 3},
+		},
+		velRow: -1,
+		velCol: 0,
+		symbol: SnakeSymbol,
+	}
+	apple = &Apple{
+		point:  &Point{row: 10, col: 10},
+		symbol: AppleSymbol,
+	}
 }
 
 func UpdateState() {
@@ -85,12 +110,11 @@ func UpdateState() {
 		return
 	}
 
-	// screenWidth, screenHeight := screen.Size()
-	for i := range gameObjects {
-		gameObjects[i].row += gameObjects[i].velRow
-		gameObjects[i].col += gameObjects[i].velCol
-	}
 }
+
+/* ****************************************** */
+// DRAWING THE GAMESTATES //
+/* ****************************************** */
 
 func drawState() {
 	if isGamePaused {
@@ -99,51 +123,59 @@ func drawState() {
 
 	screen.Clear()
 	printString(0, 0, debugLog)
-	printGameFrame()
-	for _, obj := range gameObjects {
-		drawRectArea(obj.row, obj.col, obj.width, obj.height, obj.symbol)
-	}
+	drawGameFrame()
+	drawSnake()
+	drawApple()
 
 	screen.Show()
 }
 
-// func gameEnd() bool {
-// 	return getWinner() != ""
-// }
+func drawGameFrame() {
 
-// func getWinner() string {
-// 	screenWidth, _ := screen.Size()
-// 	if ball.col < 0 {
-// 		return "Player 2"
-// 	} else if ball.col >= screenWidth {
-// 		return "Player 1"
-// 	} else {
-// 		return ""
-// 	}
-// }
-
-func printGameFrame() {
-
-	screenWidth, screenHeight := screen.Size()
-	row, col := (screenHeight/2-GameFrameHeight/2)-1, (screenWidth/2-GameFrameWidth/2)-1
+	gameTLRow, gameTLCol := getTopLeft()
+	row, col := gameTLRow-1, gameTLCol-1
 	width, height := GameFrameWidth+2, GameFrameHeight+2
 
 	drawRectPerimeter(row, col, width, height, GameFrameSymbol)
 	// drawRectPerimeter(row+1, col+1, width, height, '*')
-	drawRectPerimeter(row+1, col+1, GameFrameWidth, GameFrameHeight, '*')
+	// drawRectPerimeter(row+1, col+1, GameFrameWidth, GameFrameHeight, '*')
 
 }
 
-func pringStringCentered(row, col int, str string) {
-	col = col - len(str)/2
-	printString(row, col, str)
-}
-
-func printString(row, col int, str string) {
-	for _, c := range str {
-		screen.SetContent(col, row, c, nil, tcell.StyleDefault)
-		col += 1
+func drawSnake() {
+	for _, p := range snake.body {
+		drawInsideRectArea(p.row, p.col, 1, 1, snake.symbol)
 	}
+}
+
+func drawApple() {
+	drawInsideRectArea(apple.point.row, apple.point.col, 1, 1, apple.symbol)
+}
+
+func drawRectPerimeter(row, col, width, height int, ch rune) {
+
+	// ╔ ╗ ╝ ╚ ═
+
+	// Top wall of the box
+	screen.SetContent(col, row, '╔', nil, tcell.StyleDefault)
+	for c := 2; c < width; c++ {
+		screen.SetContent(col+c-1, row, '═', nil, tcell.StyleDefault)
+	}
+	screen.SetContent(col+width-1, row, '╗', nil, tcell.StyleDefault)
+
+	// Middle/Side walls of the box
+	for r := 1; r < height-1; r++ {
+		screen.SetContent(col, row+r, ch, nil, tcell.StyleDefault)
+		screen.SetContent(col+width-1, row+r, ch, nil, tcell.StyleDefault)
+	}
+
+	// Bottom wall of the box
+	screen.SetContent(col, row+height-1, '╚', nil, tcell.StyleDefault)
+	for c := 2; c < width; c++ {
+		screen.SetContent(col+c-1, row+height-1, '═', nil, tcell.StyleDefault)
+	}
+	screen.SetContent(col+width-1, row+height-1, '╝', nil, tcell.StyleDefault)
+
 }
 
 func drawRectArea(row, col, width, height int, ch rune) {
@@ -154,21 +186,14 @@ func drawRectArea(row, col, width, height int, ch rune) {
 	}
 }
 
-func drawRectPerimeter(row, col, width, height int, ch rune) {
-	for c := 0; c < width; c++ {
-		screen.SetContent(col+c, row, ch, nil, tcell.StyleDefault)
-	}
-
-	for r := 1; r < height-1; r++ {
-		screen.SetContent(col, row+r, ch, nil, tcell.StyleDefault)
-		screen.SetContent(col+width-1, row+r, ch, nil, tcell.StyleDefault)
-	}
-
-	for c := 0; c < width; c++ {
-		screen.SetContent(col+c, row+height-1, ch, nil, tcell.StyleDefault)
-	}
-
+func drawInsideRectArea(row, col, width, height int, ch rune) {
+	r, c := getTopLeft()
+	drawRectArea(row+r, col+c, width, height, ch)
 }
+
+/* ****************************************** */
+// USER INPUT AND HANDLING //
+/* ****************************************** */
 
 func initUserInput() chan string {
 	inputChan := make(chan string)
@@ -210,3 +235,44 @@ func handleInput(key string) {
 	// 	playerRight.row++
 	// }
 }
+
+/* ****************************************** */
+// CALCULATIONS AND PRINTING STRINGS //
+/* ****************************************** */
+
+func getTopLeft() (int, int) {
+	screenWidth, screenHeight := screen.Size()
+
+	return (screenHeight/2 - GameFrameHeight/2) - 1, (screenWidth/2 - GameFrameWidth/2) - 1
+}
+
+func pringStringCentered(row, col int, str string) {
+	col = col - len(str)/2
+	printString(row, col, str)
+}
+
+func printString(row, col int, str string) {
+	for _, c := range str {
+		screen.SetContent(col, row, c, nil, tcell.StyleDefault)
+		col += 1
+	}
+}
+
+/* ****************************************** */
+// END OF GAME //
+/* ****************************************** */
+
+// func gameEnd() bool {
+// 	return getWinner() != ""
+// }
+
+// func getWinner() string {
+// 	screenWidth, _ := screen.Size()
+// 	if ball.col < 0 {
+// 		return "Player 2"
+// 	} else if ball.col >= screenWidth {
+// 		return "Player 1"
+// 	} else {
+// 		return ""
+// 	}
+// }
