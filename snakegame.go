@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
 )
 
-// const PaddleSymbol = '1'
+// const SnakeSymbol = 'о'
+// const SnakeSymbol = '⊞'
+
 const SnakeSymbol = 0x2588
 const AppleSymbol = 0x25CF
 
@@ -48,7 +51,7 @@ func main() {
 		UpdateState()
 		drawState()
 
-		time.Sleep(70 * time.Millisecond)
+		time.Sleep(75 * time.Millisecond)
 	}
 
 	// screenWidth, screenHeight := screen.Size()
@@ -111,6 +114,7 @@ func UpdateState() {
 	}
 
 	UpdateSnake()
+	UpdateAppple()
 }
 
 func UpdateSnake() {
@@ -121,7 +125,18 @@ func UpdateSnake() {
 			col: head.col + snake.velCol,
 		})
 
-	snake.body = snake.body[1:]
+	if !appleInsideSnake() {
+		snake.body = snake.body[1:]
+	}
+}
+
+func UpdateAppple() {
+	for appleInsideSnake() {
+		apple.point.row, apple.point.col =
+			rand.Intn(GameFrameHeight),
+			rand.Intn(GameFrameWidth)
+
+	}
 }
 
 /* ****************************************** */
@@ -236,16 +251,23 @@ func handleInput(key string) {
 	if key == "Rune[q]" {
 		screen.Fini()
 		os.Exit(0)
+	} else if snake.velRow != 1 && key == "Rune[w]" || snake.velRow != 1 && key == "Up" {
+		// snake.symbol = 0x2588
+		snake.velRow = -1
+		snake.velCol = 0
+	} else if snake.velCol != 1 && key == "Rune[a]" || snake.velCol != 1 && key == "Left" {
+		// snake.symbol = '▄'
+		snake.velRow = 0
+		snake.velCol = -1
+	} else if snake.velRow != -1 && key == "Rune[s]" || snake.velRow != -1 && key == "Down" {
+		// snake.symbol = 0x2588
+		snake.velRow = 1
+		snake.velCol = 0
+	} else if snake.velCol != -1 && key == "Rune[d]" || snake.velCol != -1 && key == "Right" {
+		// snake.symbol = '▄'
+		snake.velRow = 0
+		snake.velCol = 1
 	}
-	// } else if key == "Rune[w]" && playerLeft.row > 0 {
-	// 	playerLeft.row--
-	// } else if key == "Rune[s]" && playerLeft.row+playerLeft.height < screenHeight {
-	// 	playerLeft.row++
-	// } else if key == "Up" && playerRight.row > 0 {
-	// 	playerRight.row--
-	// } else if key == "Down" && playerRight.row+playerRight.height < screenHeight {
-	// 	playerRight.row++
-	// }
 }
 
 /* ****************************************** */
@@ -268,6 +290,15 @@ func printString(row, col int, str string) {
 		screen.SetContent(col, row, c, nil, tcell.StyleDefault)
 		col += 1
 	}
+}
+
+func appleInsideSnake() bool {
+	for _, p := range snake.body {
+		if p.row == apple.point.row && p.col == apple.point.col {
+			return true
+		}
+	}
+	return false
 }
 
 /* ****************************************** */
