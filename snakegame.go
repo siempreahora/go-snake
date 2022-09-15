@@ -89,11 +89,11 @@ func initScreen() {
 func initGameState() {
 	snake = &Snake{
 		body: []*Point{
-			{row: 5, col: 3},
-			{row: 6, col: 3},
-			{row: 7, col: 3},
-			{row: 8, col: 3},
 			{row: 9, col: 3},
+			{row: 8, col: 3},
+			{row: 7, col: 3},
+			{row: 6, col: 3},
+			{row: 5, col: 3},
 		},
 		velRow: -1,
 		velCol: 0,
@@ -110,6 +110,18 @@ func UpdateState() {
 		return
 	}
 
+	UpdateSnake()
+}
+
+func UpdateSnake() {
+	head := snake.body[len(snake.body)-1]
+	snake.body = append(snake.body,
+		&Point{
+			row: head.row + snake.velRow,
+			col: head.col + snake.velCol,
+		})
+
+	snake.body = snake.body[1:]
 }
 
 /* ****************************************** */
