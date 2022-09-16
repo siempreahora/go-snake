@@ -9,9 +9,6 @@ import (
 	"github.com/gdamore/tcell/v2"
 )
 
-// const SnakeSymbol = 'о'
-// const SnakeSymbol = '⊞'
-
 const SnakeSymbol = 0x2588
 const AppleSymbol = 0x25CF
 
@@ -37,16 +34,19 @@ type Apple struct {
 var screen tcell.Screen
 var snake *Snake
 var apple *Apple
+var score int
+var pointsToClear []*Point
+var isGameOver bool
 var isGamePaused bool
 var debugLog string
 
-// This program just prints "Hello, World!".  Press ESC to exit.
 func main() {
 	initScreen()
 	initGameState()
+	screen.HideCursor()
 	inputChan := initUserInput()
 
-	for {
+	for !isGameOver {
 		handleInput(readInput(inputChan))
 		UpdateState()
 		drawState()
@@ -54,16 +54,7 @@ func main() {
 		time.Sleep(75 * time.Millisecond)
 	}
 
-	// screenWidth, screenHeight := screen.Size()
-	// winner := getWinner()
-	// pringStringCentered(screenHeight/2-1, screenWidth/2, "Game Over!")
-	// pringStringCentered(screenHeight/2, screenWidth/2, fmt.Sprintf("%s wins!", winner))
-
-	// screen.Show()
-
-	time.Sleep(3 * time.Second)
-	screen.Fini()
-	os.Exit(0)
+	gameEnd()
 }
 
 /* ****************************************** */
@@ -103,13 +94,14 @@ func initGameState() {
 		symbol: SnakeSymbol,
 	}
 	apple = &Apple{
-		point:  &Point{row: 10, col: 10},
+		point:  &Point{row: rand.Intn(GameFrameHeight), col: rand.Intn(GameFrameWidth)},
 		symbol: AppleSymbol,
 	}
 }
 
 func UpdateState() {
 	if isGamePaused {
+		drawGameFrame()
 		return
 	}
 
@@ -118,7 +110,7 @@ func UpdateState() {
 }
 
 func UpdateSnake() {
-	head := snake.body[len(snake.body)-1]
+	head := getSnakeHead()
 	snake.body = append(snake.body,
 		&Point{
 			row: head.row + snake.velRow,
@@ -127,10 +119,17 @@ func UpdateSnake() {
 
 	if !appleInsideSnake() {
 		snake.body = snake.body[1:]
+	} else {
+		score++
+	}
+
+	if wallCollide() || bitesItself() {
+		isGameOver = true
 	}
 }
 
 func UpdateAppple() {
+	rand.Seed(time.Now().UnixNano())
 	for appleInsideSnake() {
 		apple.point.row, apple.point.col =
 			rand.Intn(GameFrameHeight),
@@ -143,14 +142,25 @@ func UpdateAppple() {
 // DRAWING THE GAMESTATES //
 /* ****************************************** */
 
+func clearScreen() {
+	for _, p := range pointsToClear {
+		drawInsideRectArea(p.row, p.col, 1, 1, ' ')
+	}
+
+	pointsToClear = []*Point{}
+
+}
+
 func drawState() {
 	if isGamePaused {
 		return
 	}
 
-	screen.Clear()
+	clearScreen()
+
 	printString(0, 0, debugLog)
 	drawGameFrame()
+
 	drawSnake()
 	drawApple()
 
@@ -164,24 +174,23 @@ func drawGameFrame() {
 	width, height := GameFrameWidth+2, GameFrameHeight+2
 
 	drawRectPerimeter(row, col, width, height, GameFrameSymbol)
-	// drawRectPerimeter(row+1, col+1, width, height, '*')
-	// drawRectPerimeter(row+1, col+1, GameFrameWidth, GameFrameHeight, '*')
-
 }
 
 func drawSnake() {
-	for _, p := range snake.body {
-		drawInsideRectArea(p.row, p.col, 1, 1, snake.symbol)
+	for _, b := range snake.body {
+		drawInsideRectArea(b.row, b.col, 1, 1, snake.symbol)
+
+		pointsToClear = append(pointsToClear, b)
 	}
 }
 
 func drawApple() {
 	drawInsideRectArea(apple.point.row, apple.point.col, 1, 1, apple.symbol)
+	pointsToClear = append(pointsToClear, apple.point)
+
 }
 
 func drawRectPerimeter(row, col, width, height int, ch rune) {
-
-	// ╔ ╗ ╝ ╚ ═
 
 	// Top wall of the box
 	screen.SetContent(col, row, '╔', nil, tcell.StyleDefault)
@@ -247,24 +256,25 @@ func readInput(inputChan chan string) string {
 }
 
 func handleInput(key string) {
-	// _, screenHeight := screen.Size()
 	if key == "Rune[q]" {
 		screen.Fini()
 		os.Exit(0)
+	} else if key == "Rune[p]" {
+		isGamePaused = !isGamePaused
+
 	} else if snake.velRow != 1 && key == "Rune[w]" || snake.velRow != 1 && key == "Up" {
-		// snake.symbol = 0x2588
 		snake.velRow = -1
 		snake.velCol = 0
+
 	} else if snake.velCol != 1 && key == "Rune[a]" || snake.velCol != 1 && key == "Left" {
-		// snake.symbol = '▄'
 		snake.velRow = 0
 		snake.velCol = -1
+
 	} else if snake.velRow != -1 && key == "Rune[s]" || snake.velRow != -1 && key == "Down" {
-		// snake.symbol = 0x2588
 		snake.velRow = 1
 		snake.velCol = 0
+
 	} else if snake.velCol != -1 && key == "Rune[d]" || snake.velCol != -1 && key == "Right" {
-		// snake.symbol = '▄'
 		snake.velRow = 0
 		snake.velCol = 1
 	}
@@ -293,29 +303,52 @@ func printString(row, col int, str string) {
 }
 
 func appleInsideSnake() bool {
-	for _, p := range snake.body {
-		if p.row == apple.point.row && p.col == apple.point.col {
+	for _, b := range snake.body {
+		if b.row == apple.point.row && b.col == apple.point.col {
 			return true
 		}
 	}
 	return false
 }
 
+func wallCollide() bool {
+	head := getSnakeHead()
+	return head.row < 0 ||
+		head.row >= GameFrameHeight ||
+		head.col < 0 ||
+		head.col >= GameFrameWidth
+}
+
+func bitesItself() bool {
+	head := getSnakeHead()
+	for _, b := range snake.body[:snakeHeadIndex()] {
+		if b.row == head.row && b.col == head.col {
+			return true
+		}
+	}
+	return false
+}
+
+func snakeHeadIndex() int {
+	return len(snake.body) - 1
+}
+
+func getSnakeHead() *Point {
+	return snake.body[snakeHeadIndex()]
+}
+
 /* ****************************************** */
 // END OF GAME //
 /* ****************************************** */
 
-// func gameEnd() bool {
-// 	return getWinner() != ""
-// }
+func gameEnd() {
+	screenWidth, screenHeight := screen.Size()
+	pringStringCentered(screenHeight/2-3, screenWidth/2-1, "Game Over!")
+	pringStringCentered(screenHeight/2-2, screenWidth/2-2, fmt.Sprintf("Your score is %d", score))
 
-// func getWinner() string {
-// 	screenWidth, _ := screen.Size()
-// 	if ball.col < 0 {
-// 		return "Player 2"
-// 	} else if ball.col >= screenWidth {
-// 		return "Player 1"
-// 	} else {
-// 		return ""
-// 	}
-// }
+	screen.Show()
+
+	time.Sleep(3 * time.Second)
+	screen.Fini()
+	os.Exit(0)
+}
