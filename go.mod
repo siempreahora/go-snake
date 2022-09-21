@@ -2,7 +2,10 @@ module snake
 
 go 1.19
 
-require github.com/gdamore/tcell/v2 v2.5.3
+require (
+	github.com/TwiN/go-color v1.1.0
+	github.com/gdamore/tcell/v2 v2.5.3
+)
 
 require (
 	github.com/gdamore/encoding v1.0.0 // indirect

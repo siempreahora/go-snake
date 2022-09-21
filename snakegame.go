@@ -119,8 +119,11 @@ func UpdateSnake() {
 
 	if !appleInsideSnake() {
 		snake.body = snake.body[1:]
+	} else if apple.symbol == '■' {
+		score += 5
 	} else {
 		score++
+
 	}
 
 	if wallCollide() || bitesItself() {
@@ -135,6 +138,11 @@ func UpdateAppple() {
 			rand.Intn(GameFrameHeight),
 			rand.Intn(GameFrameWidth)
 
+		if rand.Intn(5) == 1 {
+			apple.symbol = '■'
+		} else {
+			apple.symbol = AppleSymbol
+		}
 	}
 }
 
