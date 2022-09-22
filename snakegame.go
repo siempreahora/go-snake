@@ -81,6 +81,8 @@ func initScreen() {
 }
 
 func initGameState() {
+	rand.Seed(time.Now().UnixNano())
+
 	snake = &Snake{
 		body: []*Point{
 			{row: 9, col: 3},
